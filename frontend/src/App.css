@@ -1,0 +1,5 @@
+/* App-level styles - most styling is handled by Tailwind CSS in components */
+
+html {
+  scroll-behavior: smooth;
+}
