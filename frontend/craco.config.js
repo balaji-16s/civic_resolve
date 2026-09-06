@@ -7,6 +7,14 @@ const config = {
 };
 
 module.exports = {
+  eslint:
+    false,
+  devServer: {
+    host: '0.0.0.0',
+    port: 3000,
+    allowedHosts: ['.localhost', 'localhost', '192.168.1.33'],
+    historyApiFallback: true,
+  },
   webpack: {
     alias: {
       '@': path.resolve(__dirname, 'src'),

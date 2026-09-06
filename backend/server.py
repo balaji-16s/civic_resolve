@@ -141,6 +141,60 @@ async def _send_email(to_email: str, subject: str, body: str) -> bool:
     return await asyncio.to_thread(_send_email_sync, to_email, subject, body)
 
 
+async def _send_status_notification(complaint: dict, status: str):
+    """Send email notification when complaint status changes to in-progress or resolved."""
+    user_email = complaint.get("userEmail")
+    if not user_email:
+        return
+
+    user_name = complaint.get("userName", "User")
+    issue_type = complaint.get("issueType", "")
+    dept_name = complaint.get("assignedDepartment", "")
+    officer_phone = complaint.get("officerPhone", "Not assigned yet")
+    officer_name = complaint.get("assignedOfficer", "Concerned Officer")
+    issue_label = DEPARTMENTS.get(issue_type, issue_type.replace("_", " ").title())
+
+    submitted_date = complaint.get("submittedAt")
+    if isinstance(submitted_date, datetime):
+        submitted_str = submitted_date.strftime("%B %d, %Y")
+    else:
+        submitted_str = str(submitted_date)
+
+    if status == "in-progress":
+        subject = f"Good News - Work has started on your {issue_label} complaint"
+        body = (
+            f"Dear {user_name},\n\n"
+            f"We are happy to inform you that work has now started on your {issue_label} complaint "
+            f"that was submitted on {submitted_str}.\n\n"
+            f"Our team is actively working to resolve this issue. You can expect an update soon.\n\n"
+            f"Complaint Details:\n"
+            f"- Issue: {issue_label}\n"
+            f"- Location: {complaint.get('location', 'Not specified')}\n"
+            f"- Department: {dept_name}\n"
+            f"- Officer: {officer_name}\n"
+            f"- Contact: {officer_phone}\n\n"
+            f"We appreciate your patience and will keep you updated.\n\n"
+            f"Regards,\nCivicResolve Team"
+        )
+    else:  # resolved
+        subject = f"Resolved - Your {issue_label} complaint has been fixed"
+        body = (
+            f"Dear {user_name},\n\n"
+            f"Great news! Your {issue_label} complaint submitted on {submitted_str} has been resolved.\n\n"
+            f"We hope this has addressed your concern. If you feel the issue persists or need further assistance, "
+            f"please feel free to submit a new complaint.\n\n"
+            f"Complaint Details:\n"
+            f"- Issue: {issue_label}\n"
+            f"- Location: {complaint.get('location', 'Not specified')}\n"
+            f"- Department: {dept_name}\n"
+            f"- Officer: {officer_name}\n\n"
+            f"Thank you for using CivicResolve.\n\n"
+            f"Regards,\nCivicResolve Team"
+        )
+
+    await _send_email(user_email, subject, body)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  MODELS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -220,6 +274,12 @@ class StatusUpdate(BaseModel):
 
 class OfficerAssign(BaseModel):
     officerUsername: str
+
+
+class AddOfficerRequest(BaseModel):
+    name: str
+    username: str
+    phone: str
 
 
 class GovLoginRequest(BaseModel):
@@ -1240,6 +1300,10 @@ async def update_complaint_status(complaint_id: str, body: StatusUpdate,
         doc = found
         _save_json(COMPLAINTS_FILE, complaints_collection)
 
+    # Send email notification when status changes to in-progress or resolved
+    if body.status in ("in-progress", "resolved") and doc.get("userEmail"):
+        await _send_status_notification(doc, body.status)
+
     return {"success": True, "status": doc["status"]}
 
 
@@ -1436,6 +1500,113 @@ async def get_dept_officers(dept_user: tuple = Depends(get_current_dept_user)):
         "head": {"name": head.get("name"), "phone": head.get("phone"), "username": head.get("username")},
         "officers": [{"name": o["name"], "phone": o["phone"], "username": o["username"]} for o in officers],
     }
+
+
+@api_router.get("/dept/my-complaints")
+async def get_my_dept_complaints(dept_user: tuple = Depends(get_current_dept_user)):
+    """Officers see ONLY their assigned complaints. Heads see ALL department complaints."""
+    dept_slug, role, user_info = dept_user
+    dept_data = DEPARTMENT_USERS.get(dept_slug, {})
+    officers = dept_data.get("officers", [])
+
+    # Get the officer name for matching
+    if role == "officer":
+        officer_name = user_info["name"]
+    else:
+        officer_name = None  # head sees all
+
+    if db:
+        if officer_name:
+            # Officer: only see complaints assigned to them
+            docs = await db.complaints.find({
+                "assignedDeptSlug": dept_slug,
+                "assignedOfficer": officer_name
+            }).sort("submittedAt", -1).to_list(500)
+        else:
+            # Head: sees all department complaints
+            docs = await db.complaints.find({
+                "assignedDeptSlug": dept_slug
+            }).sort("submittedAt", -1).to_list(500)
+        result = []
+        for d in docs:
+            d["id"] = str(d.pop("_id"))
+            result.append(ComplaintOut(**d))
+        return result
+    else:
+        if officer_name:
+            # Officer: only see complaints assigned to them
+            docs = [c for c in complaints_collection if c.get("assignedDeptSlug") == dept_slug 
+                    and c.get("assignedOfficer") == officer_name]
+        else:
+            # Head: sees all department complaints
+            docs = [c for c in complaints_collection if c.get("assignedDeptSlug") == dept_slug]
+        docs = sorted(docs, key=lambda c: c.get("submittedAt", ""), reverse=True)
+        result = []
+        for d in docs:
+            entry = {k: v for k, v in d.items() if k != "_id"}
+            entry["id"] = d["_id"]
+            result.append(ComplaintOut(**entry))
+        return result
+
+
+@api_router.post("/dept/officers")
+async def add_officer(body: AddOfficerRequest, dept_user: tuple = Depends(get_current_dept_user)):
+    """HOD can add a new officer to their department."""
+    dept_slug, role, user_info = dept_user
+
+    if role != "head":
+        raise HTTPException(status_code=403, detail="Only department head can add officers")
+
+    # Validate phone
+    phone = body.phone.strip()
+    if len(phone) != 10 or not phone.isdigit():
+        raise HTTPException(status_code=400, detail="Phone must be 10 digits")
+
+    # Check if username already exists in any department
+    for d_slug, d_data in DEPARTMENT_USERS.items():
+        if d_data["head"]["username"] == body.username:
+            raise HTTPException(status_code=400, detail="Username already exists")
+        for off in d_data["officers"]:
+            if off["username"] == body.username:
+                raise HTTPException(status_code=400, detail="Username already exists")
+
+    # Add new officer
+    new_officer = {
+        "name": body.name.strip(),
+        "username": body.username.strip(),
+        "password": "officer@123",  # default password, should be changed on first login
+        "phone": phone,
+    }
+    DEPARTMENT_USERS[dept_slug]["officers"].append(new_officer)
+
+    return {
+        "success": True,
+        "message": f"Officer '{body.name}' added to {DEPT_DISPLAY[dept_slug]}",
+        "officer": new_officer,
+    }
+
+
+@api_router.delete("/dept/officers/{username}")
+async def remove_officer(username: str, dept_user: tuple = Depends(get_current_dept_user)):
+    """HOD can remove an officer from their department."""
+    dept_slug, role, user_info = dept_user
+
+    if role != "head":
+        raise HTTPException(status_code=403, detail="Only department head can remove officers")
+
+    dept_data = DEPARTMENT_USERS.get(dept_slug, {})
+    officers = dept_data.get("officers", [])
+
+    for i, off in enumerate(officers):
+        if off["username"] == username:
+            removed = officers.pop(i)
+            return {
+                "success": True,
+                "message": f"Officer '{removed['name']}' removed from {DEPT_DISPLAY[dept_slug]}",
+                "officer": removed,
+            }
+
+    raise HTTPException(status_code=404, detail="Officer not found")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1759,75 +1930,106 @@ async def _check_delayed_complaints():
         logger.info("Scheduler check complete — no actions needed")
 
 async def _check_delayed_complaints():
-    """Check for complaints that have been pending for 5+ days and send notifications."""
+    """Check for complaints that have been 7+ days and send status-based notifications.
+    - Pending 7+ days: send 'pending' notification + 'will start soon' notification
+    - In-progress 10+ days: send follow-up reminder
+    - Resolved: no action needed (already got email on transition)
+    Also escalates high-severity complaints pending >48h."""
     now = datetime.now(timezone.utc)
-    five_days_ago = now - timedelta(days=5)
+    seven_days_ago = now - timedelta(days=7)
+    two_days_ago = now - timedelta(hours=48)
 
     affected = []
     for c in complaints_collection:
         submitted = c.get("submittedAt")
         if not isinstance(submitted, datetime):
             continue
-        if submitted > five_days_ago:
-            continue  # less than 5 days
-        if c.get("status") != "pending":
-            continue  # already in progress or resolved
+        if submitted > seven_days_ago:
+            continue  # less than 7 days
         if c.get("delayNotifiedAt"):
-            continue  # already notified
+            continue  # already notified for delay
 
-        # This complaint is delayed — send email
+        status = c.get("status", "pending")
         user_email = c.get("userEmail")
+        if not user_email:
+            continue
+
         user_name = c.get("userName", "User")
         issue_type = c.get("issueType", "")
         dept_name = c.get("assignedDepartment", "")
         officer_phone = c.get("officerPhone", "Not assigned yet")
         officer_name = c.get("assignedOfficer", "Concerned Officer")
+        issue_label = DEPARTMENTS.get(issue_type, issue_type.replace("_", " ").title())
+        days_pending = (now - submitted).days
+        severity = c.get("severity", "low")
 
-        # Email 1: Work starting tomorrow notification
-        subject1 = f"Update on your {issue_type} complaint — Work starting soon"
-        body1 = (
-            f"Dear {user_name},\n\n"
-            f"We regret to inform you that there has been a delay in addressing your complaint regarding {issue_type} "
-            f"submitted on {submitted.strftime('%B %d, %Y')}.\n\n"
-            f"We apologize for the inconvenience caused. The good news is that work on your complaint is scheduled "
-            f"to begin tomorrow.\n\n"
-            f"Your complaint is being handled by the {dept_name}.\n"
-            f"Concerned Officer: {officer_name}\n"
-            f"Contact Number: {officer_phone}\n\n"
-            f"If you have any further questions, please feel free to contact the officer directly.\n\n"
-            f"Regards,\nCivicResolve Team"
-        )
+        # Phase 3: Escalation Engine - high severity pending >48h
+        if severity == "high" and days_pending >= 2 and not c.get("escalatedAt"):
+            c["escalatedAt"] = now
+            logger.warning(f"ESCALATED: Complaint {c['_id'][:8]} ({issue_type}) "
+                          f"high-severity pending {days_pending}d")
+            affected.append({"id": c["_id"], "action": "escalated"})
 
-        # Email 2: Apology for delay
-        subject2 = f"Sincere Apology for the delay — {issue_type} complaint"
-        body2 = (
-            f"Dear {user_name},\n\n"
-            f"We sincerely apologize for the delay in addressing your complaint regarding {issue_type} "
-            f"that was submitted on {submitted.strftime('%B %d, %Y')}.\n\n"
-            f"We understand the inconvenience this has caused and assure you that we are taking immediate action. "
-            f"Your complaint has been prioritized and work will commence shortly.\n\n"
-            f"For any urgent concerns, please contact:\n"
-            f"Officer: {officer_name}\n"
-            f"Phone: {officer_phone}\n"
-            f"Department: {dept_name}\n\n"
-            f"We value your patience and cooperation.\n\n"
-            f"Regards,\nCivicResolve Team"
-        )
+        if status == "pending":
+            # Send 2 emails: one about pending status, one reassuring work will start soon
+            subject1 = f"Update on your {issue_label} complaint — Status review"
+            body1 = (
+                f"Dear {user_name},\n\n"
+                f"We wanted to update you on your {issue_label} complaint submitted on {submitted.strftime('%B %d, %Y')}.\n\n"
+                f"Your complaint has been under review for {days_pending} days. We sincerely apologize for the delay.\n\n"
+                f"Your complaint is currently marked as 'Pending' and is being reviewed by the {dept_name}.\n"
+                f"Once the department assigns an officer, you will receive another update.\n\n"
+                f"Thank you for your patience.\n\n"
+                f"Regards,\nCivicResolve Team"
+            )
 
-        email1_sent = await _send_email(user_email, subject1, body1)
-        email2_sent = await _send_email(user_email, subject2, body2)
+            subject2 = f"Good News — Your {issue_label} complaint will start soon"
+            body2 = (
+                f"Dear {user_name},\n\n"
+                f"We appreciate your patience regarding your {issue_label} complaint.\n\n"
+                f"We want to assure you that work on your complaint is scheduled to begin soon. "
+                f"Our team is actively working on assigning resources to address this issue.\n\n"
+                f"You will receive a notification once work has officially started.\n\n"
+                f"Complaint Details:\n"
+                f"- Issue: {issue_label}\n"
+                f"- Submitted: {submitted.strftime('%B %d, %Y')}\n"
+                f"- Department: {dept_name}\n"
+                f"- Expected: Work starting soon\n\n"
+                f"Regards,\nCivicResolve Team"
+            )
 
-        # Mark as notified
-        c["delayNotifiedAt"] = now
-        if email1_sent or email2_sent:
-            c["apologySentAt"] = now
-            affected.append({"id": c["_id"], "email": user_email})
+            email1_sent = await _send_email(user_email, subject1, body1)
+            email2_sent = await _send_email(user_email, subject2, body2)
+
+            c["delayNotifiedAt"] = now
+            if email1_sent or email2_sent:
+                c["apologySentAt"] = now
+                affected.append({"id": c["_id"], "email": user_email, "status": "pending"})
+
+        elif status == "in-progress":
+            # For in-progress complaints pending 10+ days, send a follow-up reminder
+            if days_pending >= 10:
+                subject = f"Update: Your {issue_label} complaint — Work in progress"
+                body = (
+                    f"Dear {user_name},\n\n"
+                    f"Your {issue_label} complaint has been in progress for {days_pending} days.\n\n"
+                    f"We understand you are waiting for resolution. Our team is working on your issue and "
+                    f"we appreciate your continued patience.\n\n"
+                    f"If you have any urgent concerns, please contact:\n"
+                    f"- Officer: {officer_name}\n"
+                    f"- Phone: {officer_phone}\n"
+                    f"- Department: {dept_name}\n\n"
+                    f"Regards,\nCivicResolve Team"
+                )
+                email_sent = await _send_email(user_email, subject, body)
+                if email_sent:
+                    affected.append({"id": c["_id"], "email": user_email, "status": "in-progress-reminder"})
 
     if affected:
         _save_json(COMPLAINTS_FILE, complaints_collection)
-        logger.info(f"Sent delay notifications for {len(affected)} complaints: {[a['id'][:8] for a in affected]}")
+        logger.info(f"Sent status-based notifications for {len(affected)} complaints: {[a['id'][:8] for a in affected]}")
     else:
-        logger.info("Delay check complete — no complaints need notification")
+        logger.info("Status check complete — no complaints need notification")
 
 
 async def _scheduler_loop():

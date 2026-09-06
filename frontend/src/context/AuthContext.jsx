@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { sendOtp, verifyOtp, signup as apiSignup, signin as apiSignin, setPassword as apiSetPassword, getMe, govLogin as apiGovLogin, deptLogin as apiDeptLogin, forgotPassword as apiForgotPassword, resetPassword as apiResetPassword } from "@/lib/api";
+import { sendOtp, verifyOtp, signup as apiSignup, signin as apiSignin, setPassword as apiSetPassword, getMe, govLogin as apiGovLogin, deptLogin as apiDeptLogin, forgotPassword as apiForgotPassword, resetPassword as apiResetPassword, checkEmail } from "@/lib/api";
 
 const AuthContext = createContext(null);
 
@@ -237,6 +237,9 @@ export function AuthProvider({ children }) {
   // Complete Google OAuth login with a token issued by the backend
   const loginWithGoogle = useCallback(async (token) => {
     try {
+      // Save token first so getMe() can read it from localStorage
+      const tempUser = { token };
+      localStorage.setItem("civicUser", JSON.stringify(tempUser));
       const data = await getMe();
       const userData = {
         id: data.id,
@@ -250,6 +253,7 @@ export function AuthProvider({ children }) {
       setUser(userData);
       return { success: true };
     } catch (err) {
+      localStorage.removeItem("civicUser");
       return { success: false, error: err.message };
     }
   }, []);

@@ -12,8 +12,7 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-
-export default function SignIn() {
+export default function SignIn() {
   const [step, setStep] = useState("signin"); // "signin", "setup-password"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -60,7 +59,6 @@ export default function SignIn() {
         const redirectTo = searchParams.get("redirect") || "/my-complaints";
         navigate(redirectTo);
       } else if (result.needsPasswordSetup) {
-        // Legacy OTP-only user - needs to set up password
         setEmailSent(result.emailSent || false);
         setStep("setup-password");
       } else {
@@ -127,51 +125,34 @@ export default function SignIn() {
     setEmailSent(false);
   };
 
-  const inputClass =
-    "w-full px-4 py-2.5 rounded-lg border-2 border-white/15 bg-white/10 text-white placeholder-white/40 focus:border-[#f5576c] focus:bg-white/15 focus:ring-2 focus:ring-[#f5576c]/20 transition-all outline-none";
-
-  const inputWithIconClass = (hasRightIcon = false) =>
-    `${hasRightIcon ? "pl-10 pr-10" : "pl-10 pr-4"} py-2.5 rounded-lg border-2 border-white/15 bg-white/10 text-white placeholder-white/40 focus:border-[#f5576c] focus:bg-white/15 focus:ring-2 focus:ring-[#f5576c]/20 transition-all outline-none w-full`;
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e] relative overflow-hidden flex items-center justify-center p-4">
-      {/* Decorative background */}
-      <div className="absolute top-20 -left-20 w-96 h-96 bg-[#f093fb]/15 rounded-full blur-3xl animate-float pointer-events-none" />
-      <div className="absolute bottom-20 -right-20 w-96 h-96 bg-[#f5576c]/15 rounded-full blur-3xl animate-float pointer-events-none" style={{ animationDelay: "1.5s" }} />
-      <div className="absolute top-1/3 right-1/4 w-64 h-64 bg-[#4facfe]/10 rounded-full blur-3xl animate-float pointer-events-none" style={{ animationDelay: "0.8s" }} />
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyek0zNiAyNHYySDI0di0yaDEyeiIvPjwvZz48L2c+PC9zdmc+')] opacity-40 pointer-events-none" />
-
-      <div className="relative w-full max-w-md">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-white/70 hover:text-white mb-6 transition-colors"
-        >
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <Link to="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-6 transition-colors">
           <ArrowLeft className="w-4 h-4" />
           Back to Home
         </Link>
 
-        <Card className="border-0 shadow-2xl bg-white/10 backdrop-blur-xl border border-white/10 text-white">
+        <Card className="border-0 shadow-xl">
           <CardContent className="p-8">
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-br from-[#f093fb] to-[#f5576c] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[#f5576c]/30">
+              <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 {step === "signin" ? (
-                  <LogIn className="w-8 h-8 text-white" />
+                  <LogIn className="w-7 h-7 text-emerald-600" />
                 ) : (
-                  <KeyRound className="w-8 h-8 text-white" />
+                  <KeyRound className="w-7 h-7 text-emerald-600" />
                 )}
               </div>
-              <h1 className="text-2xl font-bold text-white">
+              <h1 className="text-2xl font-bold text-slate-900 mb-1">
                 {step === "signin" ? "Welcome Back" : "Set Up Password"}
               </h1>
-              <p className="text-white/60 text-sm mt-1">
-                {step === "signin"
-                  ? "Sign in to your account to track complaints"
-                  : `Enter the OTP sent to ${email} and set a password`}
+              <p className="text-slate-500 text-sm">
+                {step === "signin" ? "Sign in to track your complaints" : `Enter OTP sent to ${email}`}
               </p>
             </div>
 
             {error && (
-              <div className="bg-red-500/15 text-red-300 text-sm p-3 rounded-lg mb-4 border border-red-500/30">
+              <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg mb-4 border border-red-200">
                 {error}
               </div>
             )}
@@ -180,217 +161,144 @@ export default function SignIn() {
               <div className="space-y-5">
                 <GoogleSignInButton label="Sign in with Google" />
                 <div className="flex items-center gap-3">
-                  <span className="h-px flex-1 bg-white/15" />
-                  <span className="text-xs uppercase tracking-wider text-white/40">
-                    or sign in with email
-                  </span>
-                  <span className="h-px flex-1 bg-white/15" />
+                  <span className="h-px flex-1 bg-slate-200" />
+                  <span className="text-xs uppercase tracking-wider text-slate-400">or with email</span>
+                  <span className="h-px flex-1 bg-slate-200" />
                 </div>
                 <form onSubmit={handleSignIn} className="space-y-4">
                   <div>
-                    <label htmlFor="signin-email" className="block text-sm font-semibold text-white/80 mb-1.5">
-                      Email Address
-                    </label>
+                    <label htmlFor="signin-email" className="block text-base font-bold text-slate-800 mb-2">Email</label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <input
                         id="signin-email"
-                        name="email"
                         type="email"
                         autoComplete="email"
                         value={email}
                         onChange={(e) => { setEmail(e.target.value); setError(""); }}
-                        className={inputWithIconClass()}
-                        placeholder="Enter your email address"
+                        className="w-full pl-10 pr-4 py-2.5 rounded-lg border-2 border-black bg-white focus:border-black focus:ring-2 focus:ring-emerald-100 transition-all outline-none"
+                        placeholder="Enter your email"
                         required
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label htmlFor="signin-password" className="block text-sm font-semibold text-white/80 mb-1.5">
-                      Password
-                    </label>
+                    <label htmlFor="signin-password" className="block text-base font-bold text-slate-800 mb-2">Password</label>
                     <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <input
                         id="signin-password"
-                        name="password"
                         type={showPassword ? "text" : "password"}
                         autoComplete="current-password"
                         value={password}
                         onChange={(e) => { setPassword(e.target.value); setError(""); }}
-                        className={inputWithIconClass(true)}
+                        className="w-full pl-10 pr-10 py-2.5 rounded-lg border-2 border-black bg-white focus:border-black focus:ring-2 focus:ring-emerald-100 transition-all outline-none"
                         placeholder="Enter your password"
                         required
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/80"
-                      >
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
                   </div>
 
-                  <div className="text-right -mt-2">
-                    <Link
-                      to="/forgot-password"
-                      className="text-sm text-[#f093fb] hover:text-[#ff6f91] font-medium hover:underline"
-                    >
+                  <div className="text-right">
+                    <Link to="/forgot-password" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium">
                       Forgot Password?
                     </Link>
                   </div>
 
-                  <Button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-gradient-to-r from-[#f5576c] to-[#ff6f91] hover:from-[#ff6f91] hover:to-[#f5576c] text-white py-6 gap-2 shadow-lg shadow-[#f5576c]/25"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Signing in...
-                      </>
-                    ) : (
-                      <>
-                        <LogIn className="w-5 h-5" />
-                        Sign In
-                      </>
-                    )}
+                  <Button type="submit" disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3">
+                    {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Signing in...</> : <><LogIn className="w-4 h-4 mr-2" />Sign In</>}
                   </Button>
                 </form>
               </div>
             ) : (
               <form onSubmit={handleSetPassword} className="space-y-4">
                 {!emailSent && (
-                  <div className="bg-amber-500/15 text-amber-300 text-sm p-3 rounded-lg border border-amber-500/30">
-                    <strong>Note:</strong> Email service not configured. Check the server console for the OTP code.
+                  <div className="bg-amber-50 text-amber-700 text-sm p-3 rounded-lg border border-amber-200">
+                    <strong>Note:</strong> Email service not configured. Check server console for OTP.
                   </div>
                 )}
 
                 <div className="text-center">
-                  <Mail className="w-10 h-10 text-[#f093fb] mx-auto mb-2" />
-                  <p className="text-sm text-white/60">
-                    An OTP was sent to<br />
-                    <strong className="text-white">{email}</strong>
-                  </p>
+                  <Mail className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
+                  <p className="text-sm text-slate-500">OTP sent to <strong className="text-slate-700">{email}</strong></p>
                 </div>
 
                 <div className="flex justify-center">
-                  <InputOTP
-                    maxLength={6}
-                    value={otp}
-                    onChange={handleOtpChange}
-                  >
+                  <InputOTP maxLength={6} value={otp} onChange={handleOtpChange}>
                     <InputOTPGroup>
                       {[0, 1, 2, 3, 4, 5].map((idx) => (
-                        <InputOTPSlot
-                          key={idx}
-                          index={idx}
-                          className="w-11 h-12 text-lg font-bold border-2 border-white/15 bg-white/5 text-white data-[active=true]:border-[#f5576c]"
-                        />
+                        <InputOTPSlot key={idx} index={idx} className="w-11 h-12 text-lg font-bold border-2 border-slate-200 bg-slate-50 text-slate-900 data-[active=true]:border-emerald-500" />
                       ))}
                     </InputOTPGroup>
                   </InputOTP>
                 </div>
 
                 <div>
-                  <label htmlFor="new-password" className="block text-sm font-semibold text-white/80 mb-1.5">
+                  <label htmlFor="new-password" className="block text-sm font-semibold text-slate-700 mb-1.5">
                     New Password
                   </label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                       id="new-password"
                       type={showNewPassword ? "text" : "password"}
                       autoComplete="new-password"
                       value={newPassword}
                       onChange={(e) => { setNewPassword(e.target.value); setError(""); }}
-                      className={inputWithIconClass(true)}
-                      placeholder="Create a new password (min 6 characters)"
+                      className="w-full pl-10 pr-10 py-2.5 rounded-lg border-2 border-slate-200 bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all outline-none"
+                      placeholder="Create a new password"
                       required
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/80"
-                    >
+                    <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                       {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="confirm-password" className="block text-sm font-semibold text-white/80 mb-1.5">
+                  <label htmlFor="confirm-password" className="block text-sm font-semibold text-slate-700 mb-1.5">
                     Confirm Password
                   </label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                       id="confirm-password"
                       type={showConfirmPassword ? "text" : "password"}
                       autoComplete="new-password"
                       value={confirmPassword}
                       onChange={(e) => { setConfirmPassword(e.target.value); setError(""); }}
-                      className={inputWithIconClass(true)}
-                      placeholder="Re-enter your password"
+                      className="w-full pl-10 pr-10 py-2.5 rounded-lg border-2 border-slate-200 bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all outline-none"
+                      placeholder="Re-enter password"
                       required
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/80"
-                    >
+                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                       {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
 
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-gradient-to-r from-[#f5576c] to-[#ff6f91] hover:from-[#ff6f91] hover:to-[#f5576c] text-white py-6 gap-2 shadow-lg shadow-[#f5576c]/25"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Setting up...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-5 h-5" />
-                      Set Password & Sign In
-                    </>
-                  )}
+                <Button type="submit" disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3">
+                  {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Setting up...</> : <><CheckCircle2 className="w-4 h-4 mr-2" />Set Password & Sign In</>}
                 </Button>
 
                 <div className="text-center">
-                  <button
-                    type="button"
-                    onClick={handleBackToSignIn}
-                    className="text-sm text-white/50 hover:text-white/80 underline underline-offset-2"
-                  >
+                  <button type="button" onClick={handleBackToSignIn} className="text-sm text-slate-500 hover:text-slate-700 underline underline-offset-2">
                     ← Back to Sign In
                   </button>
                 </div>
               </form>
             )}
 
-            <div className="mt-6 pt-6 border-t border-white/10 space-y-3 text-center">
-              <p className="text-sm text-white/60">
-                Don't have an account?{" "}
-                <Link to="/signup" className="text-[#f093fb] hover:text-[#ff6f91] font-medium">
-                  Create Account
-                </Link>
+            <div className="mt-6 pt-6 border-t border-slate-100 space-y-3 text-center">
+              <p className="text-sm text-slate-500">
+                Don't have an account? <Link to="/signup" className="text-emerald-600 hover:text-emerald-700 font-medium">Create Account</Link>
               </p>
-              <p className="text-sm text-white/60">
-                Are you a government official?{" "}
-                <Link to="/gov-login" className="inline-flex items-center gap-1 text-[#f093fb] hover:text-[#ff6f91] font-medium">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  Government Login
-                </Link>
+              <p className="text-sm text-slate-500">
+                Government official? <Link to="/gov-login" className="inline-flex items-center gap-1 text-sky-600 hover:text-sky-700 font-medium"><ShieldCheck className="w-3.5 h-3.5" />Government Login</Link>
               </p>
             </div>
           </CardContent>

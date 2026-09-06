@@ -9,13 +9,13 @@
     "description": "Garbage not collected in our area for over a week. The garbage bins are overflowing and stray dogs are spreading trash everywhere. This is becoming a serious health hazard for the neighborhood. Request immediate action.",
     "location": "18.1167, 83.4167",
     "severity": "high",
-    "status": "pending",
+    "status": "in-progress",
     "assignedDepartment": "Municipal Department",
     "assignedDeptSlug": "municipal",
     "assignedOfficer": "Officer Rajesh",
     "officerPhone": "9876543211",
     "submittedAt": "2026-07-16T03:12:31.917997+00:00",
-    "workStartedAt": null,
+    "workStartedAt": "2026-09-01T13:42:33.583877+00:00",
     "delayNotifiedAt": "2026-07-23T03:12:32.278049+00:00",
     "apologySentAt": "2026-07-23T03:12:32.278049+00:00",
     "photo": null
@@ -39,7 +39,8 @@
     "workStartedAt": "2026-07-22T03:12:31.917997+00:00",
     "delayNotifiedAt": null,
     "apologySentAt": null,
-    "photo": null
+    "photo": null,
+    "escalatedAt": "2026-09-06T15:41:01.168106+00:00"
   },
   {
     "_id": "eb4ac355-9dcb-4312-a3b2-c30722c59487",
@@ -144,7 +145,8 @@
     "workStartedAt": "2026-07-05T03:12:31.917997+00:00",
     "delayNotifiedAt": null,
     "apologySentAt": null,
-    "photo": null
+    "photo": null,
+    "escalatedAt": "2026-09-06T15:41:01.168106+00:00"
   },
   {
     "_id": "9e306c14-a6c1-4ca0-a854-e238b31de1bf",
@@ -312,7 +314,8 @@
     "workStartedAt": "2026-07-22T15:12:31.917997+00:00",
     "delayNotifiedAt": null,
     "apologySentAt": null,
-    "photo": null
+    "photo": null,
+    "escalatedAt": "2026-09-06T15:41:01.168106+00:00"
   },
   {
     "_id": "bb0c1864-7da6-45c8-8b7c-4cbb92136baf",
@@ -333,6 +336,72 @@
     "workStartedAt": "2026-07-11T03:12:31.917997+00:00",
     "delayNotifiedAt": null,
     "apologySentAt": null,
+    "photo": null
+  },
+  {
+    "_id": "8a0fc286-40e1-4c8f-950b-4c26e244ae0b",
+    "userId": "475886d0-a019-477e-848f-08b2eae556d7",
+    "userName": "sai balaji",
+    "userEmail": "saibalajimeduri@gmail.com",
+    "userPhone": "7794847729",
+    "issueType": "pothole",
+    "severity": "low",
+    "description": "hello",
+    "location": "18.059585, 83.410177",
+    "photo": null,
+    "status": "pending",
+    "assignedDepartment": "Public Works Department (PWD)",
+    "assignedDeptSlug": "pwd",
+    "assignedOfficer": null,
+    "officerPhone": null,
+    "submittedAt": "2026-09-06T13:08:33.697063+00:00",
+    "workStartedAt": null,
+    "delayNotifiedAt": null,
+    "apologySentAt": null,
+    "escalatedAt": null
+  },
+  {
+    "_id": "931d459e-ec20-42e8-bfc7-538028da7aed",
+    "userId": "59f0c13a-428b-4ef0-9d12-4211c79c1f17",
+    "userName": "Saibalaji Meduri",
+    "userEmail": "medurisaibalaji16@gmail.com",
+    "userPhone": "7794847729",
+    "issueType": "pothole",
+    "description": "There is a large pothole on the main road near my house. It has been there for over a week and several vehicles have already been damaged. The road is also uneven and causing problems for two-wheelers. Request immediate repair.",
+    "location": "18.1167, 83.4167",
+    "severity": "medium",
+    "status": "in-progress",
+    "assignedDepartment": "Public Works Department (PWD)",
+    "assignedDeptSlug": "pwd",
+    "assignedOfficer": "Officer Venkat",
+    "officerPhone": "9876543231",
+    "submittedAt": "2026-08-25T13:42:33.583826+00:00",
+    "workStartedAt": "2026-09-04T13:42:33.583865+00:00",
+    "delayNotifiedAt": null,
+    "apologySentAt": null,
+    "escalatedAt": null,
+    "photo": null
+  },
+  {
+    "_id": "6defd0fb-7377-421b-94b8-9efa5ff22fc1",
+    "userId": "efd78478-76ab-46f9-96ed-b73322bf4b70",
+    "userName": "Sai Balaji",
+    "userEmail": "saibalajimeduri@gmail.com",
+    "userPhone": "7794847729",
+    "issueType": "streetlight",
+    "description": "Street light on our street has been broken for over a month. The area is completely dark at night and it's not safe for children and elderly people walking in the evening. Requesting immediate replacement.",
+    "location": "18.1167, 83.4167",
+    "severity": "medium",
+    "status": "resolved",
+    "assignedDepartment": "Electrical Department",
+    "assignedDeptSlug": "electrical",
+    "assignedOfficer": "Officer Deepak",
+    "officerPhone": "9876543221",
+    "submittedAt": "2026-08-17T13:42:33.583898+00:00",
+    "workStartedAt": "2026-08-22T13:42:33.583901+00:00",
+    "delayNotifiedAt": null,
+    "apologySentAt": null,
+    "escalatedAt": null,
     "photo": null
   }
 ]
