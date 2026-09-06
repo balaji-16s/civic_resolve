@@ -11,6 +11,7 @@ import SignIn from "@/components/SignIn";
 import Login from "@/components/Login";
 import GovLogin from "@/components/GovLogin";
 import ForgotPassword from "@/components/ForgotPassword";
+import GoogleCallback from "@/components/GoogleCallback";
 import MyComplaints from "@/components/MyComplaints";
 import Dashboard from "@/components/Dashboard";
 import DeptLogin from "@/components/DeptLogin";
@@ -30,6 +31,7 @@ function App() {
             <Route path="/signup" element={<SignUp />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/auth/google/callback" element={<GoogleCallback />} />
             <Route path="/login" element={<Login />} />
             <Route path="/report" element={<ReportStart />} />
             <Route path="/report-form" element={

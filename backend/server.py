@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, Header
+from fastapi.responses import RedirectResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 import os
@@ -17,6 +18,8 @@ from typing import List, Optional
 from datetime import datetime, timezone, timedelta
 import re
 import asyncio
+import urllib.parse
+import urllib.request
 from contextlib import asynccontextmanager
 
 ROOT_DIR = Path(__file__).parent
@@ -28,6 +31,14 @@ DB_NAME = os.environ.get('DB_NAME', 'civicresolve')
 JWT_SECRET = os.environ.get('JWT_SECRET', 'civicresolve-sih-demo-secret')
 JWT_ALGORITHM = 'HS256'
 JWT_EXPIRY_HOURS = 72
+
+# ── Google OAuth (Sign in / Sign up with Google) ────────────────────────────
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+# Must EXACTLY match a redirect URI registered in Google Cloud Console
+GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'http://localhost:8000/api/auth/google/callback')
+# Where the browser is sent after Google login completes (your React app)
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 
 # ── Email (SMTP for OTP delivery) ──────────────────────────────────────────
 SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
@@ -86,7 +97,7 @@ db = None
 
 otp_store = {}          # email -> { otp, expires_at }
 users_collection = _load_json(USERS_FILE, [], convert_dates=["createdAt"])
-complaints_collection = _load_json(COMPLAINTS_FILE, [], convert_dates=["submittedAt"])
+complaints_collection = _load_json(COMPLAINTS_FILE, [], convert_dates=["submittedAt", "workStartedAt", "delayNotifiedAt", "apologySentAt", "escalatedAt"])
 
 if MONGO_URL:
     from motor.motor_asyncio import AsyncIOMotorClient
@@ -101,7 +112,7 @@ logger = logging.getLogger(__name__)
 api_router = APIRouter(prefix="/api")
 
 # ── Email helper ────────────────────────────────────────────────────────────
-def _send_email(to_email: str, subject: str, body: str) -> bool:
+def _send_email_sync(to_email: str, subject: str, body: str) -> bool:
     """Send an email via SMTP. Returns True if sent, False if not configured."""
     if not SMTP_USER or not SMTP_PASSWORD:
         logger.warning("SMTP credentials not set — email would not be sent")
@@ -113,7 +124,7 @@ def _send_email(to_email: str, subject: str, body: str) -> bool:
         msg["From"] = email.utils.formataddr((EMAIL_FROM_NAME, EMAIL_FROM))
         msg["To"] = to_email
 
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
             server.starttls()
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.sendmail(EMAIL_FROM, [to_email], msg.as_string())
@@ -123,6 +134,11 @@ def _send_email(to_email: str, subject: str, body: str) -> bool:
     except Exception as e:
         logger.error(f"Failed to send email to {to_email}: {e}")
         return False
+
+
+async def _send_email(to_email: str, subject: str, body: str) -> bool:
+    """Send an email without blocking the event loop (runs SMTP in a worker thread)."""
+    return await asyncio.to_thread(_send_email_sync, to_email, subject, body)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -522,7 +538,7 @@ async def send_otp(body: OTPRequest):
         f"If you did not request this, please ignore this email.\n\n"
         f"Regards,\nCivicResolve Team"
     )
-    email_sent = _send_email(email, subject, body_text)
+    email_sent = await _send_email(email, subject, body_text)
 
     # Always log the OTP to console for debugging / dev fallback
     logger.info(f"OTP for {email}: {otp} | Email sent: {email_sent}")
@@ -575,7 +591,7 @@ async def signup(body: SignUpRequest):
         f"This code is valid for 5 minutes. Please do not share this code with anyone.\n\n"
         f"Regards,\nCivicResolve Team"
     )
-    email_sent = _send_email(email, subject, body_text)
+    email_sent = await _send_email(email, subject, body_text)
     logger.info(f"Signup OTP for {email}: {otp} | Email sent: {email_sent}")
 
     return {
@@ -706,7 +722,7 @@ async def signin(body: SignInRequest):
             f"This code is valid for 5 minutes.\n\n"
             f"Regards,\nCivicResolve Team"
         )
-        email_sent = _send_email(email, subject, body_text)
+        email_sent = await _send_email(email, subject, body_text)
         logger.info(f"Password setup OTP for {email}: {otp} | Email sent: {email_sent}")
 
         return {
@@ -783,7 +799,7 @@ async def forgot_password(body: ForgotPasswordRequest):
         f"If you did not request this, please ignore this email.\n\n"
         f"Regards,\nCivicResolve Team"
     )
-    email_sent = _send_email(email, subject, body_text)
+    email_sent = await _send_email(email, subject, body_text)
     logger.info(f"Forgot password OTP for {email}: {otp} | Email sent: {email_sent}")
 
     return ForgotPasswordResponse(
@@ -958,6 +974,133 @@ async def get_me(user: dict = Depends(get_current_user)):
         "phone": user["phone"],
         "createdAt": user["createdAt"].isoformat() if isinstance(user["createdAt"], datetime) else user["createdAt"],
     }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  GOOGLE OAUTH — Sign In / Sign Up with Google
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _google_exchange_code(code: str) -> dict:
+    """Exchange the OAuth authorization code for access/id tokens."""
+    data = urllib.parse.urlencode({
+        "code": code,
+        "client_id": GOOGLE_CLIENT_ID,
+        "client_secret": GOOGLE_CLIENT_SECRET,
+        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "grant_type": "authorization_code",
+    }).encode()
+    req = urllib.request.Request(
+        "https://oauth2.googleapis.com/token",
+        data=data,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return json.loads(resp.read().decode())
+
+
+def _google_fetch_profile(access_token: str) -> dict:
+    """Fetch the user's profile from Google using the access token."""
+    req = urllib.request.Request(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return json.loads(resp.read().decode())
+
+
+def _google_redirect(frontend_path: str) -> RedirectResponse:
+    """Redirect the browser to the React app (with token or an error code)."""
+    return RedirectResponse(f"{FRONTEND_URL}{frontend_path}", status_code=302)
+
+
+def _google_state_qs(state: Optional[str]) -> str:
+    """Echo Google's state param (our post-login destination) back to the frontend.
+    Only paths starting with '/' are accepted to avoid open-redirect abuse."""
+    if state and state.startswith("/"):
+        return "&" + urllib.parse.urlencode({"state": state})
+    return ""
+
+
+@api_router.get("/auth/google/callback")
+async def google_callback(code: Optional[str] = None, error: Optional[str] = None, state: Optional[str] = None):
+    """Google OAuth redirect target: exchange code, find-or-create the user, log them in.
+    Works for both Sign Up (new user) and Sign In (existing user)."""
+    state_qs = _google_state_qs(state)
+    if error or not code:
+        return _google_redirect(f"/auth/google/callback?error={error or 'access_denied'}{state_qs}")
+
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        logger.error("Google OAuth attempted but GOOGLE_CLIENT_ID/SECRET not configured")
+        return _google_redirect(f"/auth/google/callback?error=not_configured{state_qs}")
+
+    try:
+        tokens = await asyncio.to_thread(_google_exchange_code, code)
+    except Exception as e:
+        logger.error(f"Google token exchange failed: {e}")
+        return _google_redirect(f"/auth/google/callback?error=token_exchange_failed{state_qs}")
+
+    access_token = tokens.get("access_token")
+    if not access_token:
+        return _google_redirect(f"/auth/google/callback?error=invalid_token{state_qs}")
+
+    try:
+        profile = await asyncio.to_thread(_google_fetch_profile, access_token)
+    except Exception as e:
+        logger.error(f"Google profile fetch failed: {e}")
+        return _google_redirect(f"/auth/google/callback?error=profile_fetch_failed{state_qs}")
+
+    email = (profile.get("email") or "").strip().lower()
+    if not email:
+        return _google_redirect(f"/auth/google/callback?error=no_email{state_qs}")
+    if not profile.get("email_verified"):
+        return _google_redirect(f"/auth/google/callback?error=email_not_verified{state_qs}")
+
+    name = (profile.get("name") or profile.get("given_name") or email.split("@")[0]).strip() or "Google User"
+    google_id = str(profile.get("sub", ""))
+
+    # Find-or-create the user (Google sign-in === sign-up for us)
+    if db:
+        user = await db.users.find_one({"email": email})
+        if user:
+            await db.users.update_one(
+                {"_id": user["_id"]},
+                {"$set": {"name": name, "googleId": google_id}},
+            )
+        else:
+            user = {
+                "_id": str(uuid.uuid4()),
+                "name": name,
+                "email": email,
+                "phone": "",
+                "googleId": google_id,
+                "createdAt": datetime.now(timezone.utc),
+            }
+            await db.users.insert_one(user)
+    else:
+        user = next((u for u in users_collection if u["email"] == email), None)
+        if not user:
+            user = {
+                "_id": str(uuid.uuid4()),
+                "name": name,
+                "email": email,
+                "phone": "",
+                "googleId": google_id,
+                "createdAt": datetime.now(timezone.utc),
+            }
+            users_collection.append(user)
+            _save_json(USERS_FILE, users_collection)
+        else:
+            user["name"] = name
+            user["googleId"] = google_id
+            _save_json(USERS_FILE, users_collection)
+
+    token = _create_token(user["_id"])
+    params = urllib.parse.urlencode({
+        "token": token,
+        "name": user["name"],
+        "email": user["email"],
+    })
+    return _google_redirect(f"/auth/google/callback?{params}{state_qs}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1600,8 +1743,8 @@ async def _check_delayed_complaints():
                 f"Regards,\nCivicResolve Team"
             )
 
-        email1_sent = _send_email(user_email, subject1, body1)
-        email2_sent = _send_email(user_email, subject2, body2)
+        email1_sent = await _send_email(user_email, subject1, body1)
+        email2_sent = await _send_email(user_email, subject2, body2)
 
         # Mark as notified
         c["delayNotifiedAt"] = now
@@ -1671,8 +1814,8 @@ async def _check_delayed_complaints():
             f"Regards,\nCivicResolve Team"
         )
 
-        email1_sent = _send_email(user_email, subject1, body1)
-        email2_sent = _send_email(user_email, subject2, body2)
+        email1_sent = await _send_email(user_email, subject1, body1)
+        email2_sent = await _send_email(user_email, subject2, body2)
 
         # Mark as notified
         c["delayNotifiedAt"] = now
@@ -2160,7 +2303,7 @@ if __name__ == "__main__":
     import time
 
     # ── Free up port 8000 if it's still held by a previous process ──
-    port = 8000
+    port = int(os.environ.get("PORT", "8000"))
     try:
         # Try killing with lsof first
         try:

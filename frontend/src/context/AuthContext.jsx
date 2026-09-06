@@ -234,6 +234,26 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // Complete Google OAuth login with a token issued by the backend
+  const loginWithGoogle = useCallback(async (token) => {
+    try {
+      const data = await getMe();
+      const userData = {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        token,
+        role: "citizen",
+      };
+      localStorage.setItem("civicUser", JSON.stringify(userData));
+      setUser(userData);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem("civicUser");
     localStorage.removeItem("civicDeptUser");
@@ -256,6 +276,7 @@ export function AuthProvider({ children }) {
         deptLogin,
         forgotPassword,
         resetPassword,
+        loginWithGoogle,
         logout,
         isAuthenticated: !!user,
         isDept: !!deptUser,

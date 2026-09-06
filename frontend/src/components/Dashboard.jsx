@@ -130,9 +130,15 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-[#0f0c29] via-[#1e1b3a] to-[#24243e] relative overflow-hidden">
+      {/* Decorative background */}
+      <div className="absolute top-32 -left-24 w-96 h-96 bg-[#f093fb]/10 rounded-full blur-3xl animate-float pointer-events-none" />
+      <div className="absolute bottom-40 -right-24 w-96 h-96 bg-[#f5576c]/10 rounded-full blur-3xl animate-float pointer-events-none" style={{ animationDelay: "1.5s" }} />
+      <div className="absolute top-1/3 right-1/4 w-64 h-64 bg-[#4facfe]/10 rounded-full blur-3xl animate-float pointer-events-none" style={{ animationDelay: "0.8s" }} />
+      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyek0zNiAyNHYySDI0di0yaDEyeiIvPjwvZz48L2c+PC9zdmc+')] opacity-40 pointer-events-none" />
+
       {/* Header */}
-      <header className="bg-gradient-to-r from-gray-900 to-slate-800 text-white">
+      <header className="relative z-10 bg-gradient-to-r from-[#0f0c29] via-[#302b63] to-[#24243e] text-white border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex justify-between items-center">
           <h1 className="text-2xl font-bold flex items-center gap-3">
             <BarChart3 className="w-7 h-7" />
@@ -155,7 +161,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Error */}
         {error && (
           <div className="bg-red-50 text-red-600 text-sm p-4 rounded-xl border border-red-200">
@@ -166,7 +172,7 @@ export default function Dashboard() {
         {/* Phase 4: AI Insights Panel */}
         {!loading && insights && (
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4 text-white">
+            <div className="bg-gradient-to-r from-[#f093fb] to-[#f5576c] px-6 py-4 text-white">
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-5 h-5" />
                 <h3 className="font-semibold">AI-Powered Insights</h3>
@@ -175,17 +181,17 @@ export default function Dashboard() {
             <div className="p-6 space-y-4">
               {/* Summary row */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-indigo-50 rounded-xl p-3 text-center">
-                  <div className="text-2xl font-bold text-indigo-600">{insights.summary.totalComplaints}</div>
-                  <div className="text-xs text-indigo-500">Total All Time</div>
+                <div className="bg-[#f093fb]/10 rounded-xl p-3 text-center">
+                  <div className="text-2xl font-bold text-[#f5576c]">{insights.summary.totalComplaints}</div>
+                  <div className="text-xs text-[#f5576c]/70">Total All Time</div>
                 </div>
-                <div className="bg-teal-50 rounded-xl p-3 text-center">
-                  <div className="text-2xl font-bold text-teal-600">{insights.summary.currentWeek}</div>
-                  <div className="text-xs text-teal-500">This Week</div>
+                <div className="bg-[#4facfe]/10 rounded-xl p-3 text-center">
+                  <div className="text-2xl font-bold text-[#4facfe]">{insights.summary.currentWeek}</div>
+                  <div className="text-xs text-[#4facfe]/70">This Week</div>
                 </div>
-                <div className="bg-amber-50 rounded-xl p-3 text-center">
-                  <div className="text-2xl font-bold text-amber-600">{insights.summary.previousWeek}</div>
-                  <div className="text-xs text-amber-500">Last Week</div>
+                <div className="bg-[#ffd200]/10 rounded-xl p-3 text-center">
+                  <div className="text-2xl font-bold text-[#e8c200]">{insights.summary.previousWeek}</div>
+                  <div className="text-xs text-[#ffd200]/70">Last Week</div>
                 </div>
                 <div className={`rounded-xl p-3 text-center ${
                   insights.summary.weekChange > 0 ? "bg-red-50" : "bg-emerald-50"
@@ -279,9 +285,9 @@ export default function Dashboard() {
         {/* Stats Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { label: "Total Complaints", value: stats.total, color: "border-l-indigo-500" },
-            { label: "Pending", value: stats.pending, color: "border-l-amber-500" },
-            { label: "In Progress", value: stats.inProgress, color: "border-l-blue-500" },
+            { label: "Total Complaints", value: stats.total, color: "border-l-[#f5576c]" },
+            { label: "Pending", value: stats.pending, color: "border-l-[#ffd200]" },
+            { label: "In Progress", value: stats.inProgress, color: "border-l-[#4facfe]" },
             { label: "Resolved", value: stats.resolved, color: "border-l-emerald-500" },
           ].map((s) => (
             <div key={s.label} className={`bg-white rounded-2xl p-5 shadow-sm border-l-4 ${s.color}`}>
@@ -294,7 +300,7 @@ export default function Dashboard() {
         {/* Loading */}
         {loading && (
           <div className="flex justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+            <Loader2 className="w-8 h-8 animate-spin text-[#f5576c]" />
           </div>
         )}
 
@@ -302,7 +308,7 @@ export default function Dashboard() {
         {!loading && activeComplaints.filter(c => c.location && c.location.includes(",")).length > 0 && (
           <div className="bg-white rounded-2xl p-6 shadow-sm">
             <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-red-500" />
+              <MapPin className="w-5 h-5 text-[#f5576c]" />
               Active Complaint Locations
             </h3>
             <div className="h-[400px] rounded-xl overflow-hidden border border-gray-200">
@@ -383,7 +389,7 @@ export default function Dashboard() {
             <div className="grid sm:grid-cols-4 gap-4 items-end">
               <div>
                 <label htmlFor="filter-status" className="block text-sm font-semibold text-gray-700 mb-1">Filter by Status</label>
-                <select id="filter-status" name="filter-status" value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))} className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 bg-gray-50 focus:border-indigo-500 outline-none transition-all">
+                <select id="filter-status" name="filter-status" value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))} className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 bg-gray-50 focus:border-[#f5576c] outline-none transition-all">
                   <option value="">All Status</option>
                   <option value="pending">Pending</option>
                   <option value="in-progress">In Progress</option>
@@ -392,7 +398,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <label htmlFor="filter-category" className="block text-sm font-semibold text-gray-700 mb-1">Filter by Category</label>
-                <select id="filter-category" name="filter-category" value={filters.category} onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))} className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 bg-gray-50 focus:border-indigo-500 outline-none transition-all">
+                <select id="filter-category" name="filter-category" value={filters.category} onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))} className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 bg-gray-50 focus:border-[#f5576c] outline-none transition-all">
                   <option value="">All Categories</option>
                   {Object.entries(issueLabels).map(([k, v]) => (
                     <option key={k} value={k}>{v}</option>
@@ -401,7 +407,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <label htmlFor="filter-severity" className="block text-sm font-semibold text-gray-700 mb-1">Filter by Severity</label>
-                <select id="filter-severity" name="filter-severity" value={filters.severity} onChange={(e) => setFilters((f) => ({ ...f, severity: e.target.value }))} className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 bg-gray-50 focus:border-indigo-500 outline-none transition-all">
+                <select id="filter-severity" name="filter-severity" value={filters.severity} onChange={(e) => setFilters((f) => ({ ...f, severity: e.target.value }))} className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 bg-gray-50 focus:border-[#f5576c] outline-none transition-all">
                   <option value="">All Severities</option>
                   <option value="high">High</option>
                   <option value="medium">Medium</option>
