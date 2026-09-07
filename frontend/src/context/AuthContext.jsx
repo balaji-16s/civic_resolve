@@ -193,7 +193,7 @@ export function AuthProvider({ children }) {
         };
         localStorage.setItem("civicDeptUser", JSON.stringify(deptData));
         setDeptUser(deptData);
-        return { success: true };
+        return { success: true, role: result.user.role, deptUser: deptData };
       }
       return { success: false, error: "Login failed" };
     } catch (err) {
@@ -201,7 +201,6 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Forgot password - send OTP
   const forgotPassword = useCallback(async (email) => {
     try {
       const result = await apiForgotPassword(email);
@@ -282,11 +281,13 @@ export function AuthProvider({ children }) {
         resetPassword,
         loginWithGoogle,
         logout,
-        isAuthenticated: !!user,
-        isDept: !!deptUser,
-        isGov: user?.role === "gov",
-        isCitizen: user?.role === "citizen",
-      }}
+      isAuthenticated: !!user || !!deptUser,
+      isDept: !!deptUser,
+      isGov: !!user && user.role === "gov",
+      isCitizen: !!user && user.role === "citizen",
+      isOfficer: !!deptUser && deptUser.role === "officer",
+      isHead: !!deptUser && deptUser.role === "head",
+    }}
     >
       {children}
     </AuthContext.Provider>

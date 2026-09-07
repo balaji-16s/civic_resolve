@@ -3,8 +3,9 @@ import { useAuth } from "@/context/AuthContext";
 import { ShieldCheck, Home, Camera, BarChart3, FileText, LogIn, LogOut, User, Building } from "lucide-react";
 export default function Layout() {
   const location = useLocation();
-  const { isAuthenticated, isGov, isCitizen, isDept, user, logout } = useAuth();
+  const { isAuthenticated, isGov, isCitizen, isDept, user, deptUser, logout } = useAuth();
   const isActive = (path) => location.pathname === path;
+  const deptHomePath = deptUser?.role === "head" ? "/dept-dashboard" : "/officer-dashboard";
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -53,8 +54,8 @@ import { ShieldCheck, Home, Camera, BarChart3, FileText, LogIn, LogOut, User, Bu
               )}
 
               {isDept && (
-                <Link to="/dept-dashboard" className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${isActive("/dept-dashboard") ? "bg-amber-50 text-amber-700" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}>
-                  <BarChart3 className="w-4 h-4" /><span className="hidden sm:inline">Dept Dashboard</span>
+                <Link to={deptHomePath} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${isActive(deptHomePath) ? "bg-amber-50 text-amber-700" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}>
+                  <BarChart3 className="w-4 h-4" /><span className="hidden sm:inline">{deptUser?.role === "head" ? "Head Dashboard" : "My Work"}</span>
                 </Link>
               )}
 

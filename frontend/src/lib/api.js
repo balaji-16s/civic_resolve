@@ -140,6 +140,11 @@ export function getDeptComplaints() {
   return request("/dept/complaints");
 }
 
+export function getMyDeptComplaints() {
+  // Officer-scoped: only complaints assigned to the logged-in officer
+  return request("/dept/my-complaints");
+}
+
 export function updateDeptComplaintStatus(id, status) {
   return request(`/dept/complaints/${id}/status`, {
     method: "PUT",
@@ -156,6 +161,62 @@ export function assignOfficer(complaintId, officerUsername) {
 
 export function getDeptOfficers() {
   return request("/dept/officers");
+}
+
+export function addOfficer(name, username, phone) {
+  return request("/dept/officers", {
+    method: "POST",
+    body: JSON.stringify({ name, username, phone }),
+  });
+}
+
+export function updateOfficer(username, name, phone) {
+  return request(`/dept/officers/${username}`, {
+    method: "PUT",
+    body: JSON.stringify({ name, phone }),
+  });
+}
+
+export function removeOfficer(username) {
+  return request(`/dept/officers/${username}`, {
+    method: "DELETE",
+  });
+}
+
+// ── Government (gov admin) ──────────────────────────────────────────────────
+export function govGetDepartmentsOverview() {
+  return request("/gov/departments");
+}
+
+export function govUpdateHead(deptSlug, username, name, phone) {
+  return request(`/gov/departments/${deptSlug}/head`, {
+    method: "PUT",
+    body: JSON.stringify({ username, name, phone }),
+  });
+}
+
+export function govGetDeptOfficers(deptSlug) {
+  return request(`/gov/departments/${deptSlug}/officers`);
+}
+
+export function govAddOfficer(deptSlug, name, username, phone) {
+  return request(`/gov/departments/${deptSlug}/officers`, {
+    method: "POST",
+    body: JSON.stringify({ name, username, phone }),
+  });
+}
+
+export function govUpdateOfficer(deptSlug, username, name, phone) {
+  return request(`/gov/departments/${deptSlug}/officers/${username}`, {
+    method: "PUT",
+    body: JSON.stringify({ name, phone }),
+  });
+}
+
+export function govRemoveOfficer(deptSlug, username) {
+  return request(`/gov/departments/${deptSlug}/officers/${username}`, {
+    method: "DELETE",
+  });
 }
 
 // ── AI Insights ────────────────────────────────────────────────────────────

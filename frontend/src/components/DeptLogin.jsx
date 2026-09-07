@@ -37,7 +37,8 @@ export default function DeptLogin() {
     setLoading(false);
 
     if (result.success) {
-      navigate("/dept-dashboard");
+      // Heads manage the whole department queue + officers; officers only see their own work
+      navigate(result.role === "head" ? "/dept-dashboard" : "/officer-dashboard");
     } else {
       setError(result.error || "Invalid credentials.");
     }

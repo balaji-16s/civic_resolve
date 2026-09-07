@@ -147,8 +147,12 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <Link to="/" className="inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 rounded-xl px-4 py-2 text-sm font-medium transition-all">
               <ArrowLeft className="w-4 h-4" />
-              Back to Home
+              Home
             </Link>
+            <button onClick={() => navigate("/gov/departments")} className="inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 rounded-xl px-4 py-2 text-sm font-medium transition-all">
+              <Building className="w-4 h-4" />
+              Departments
+            </button>
             <button onClick={() => { logout(); navigate("/gov-login", { replace: true }); }} className="inline-flex items-center gap-2 bg-red-500/20 hover:bg-red-500/40 rounded-xl px-4 py-2 text-sm font-medium transition-all">
               <LogOut className="w-4 h-4" />
               Logout
@@ -454,12 +458,16 @@ export default function Dashboard() {
                     </div>
                     <h4 className="font-semibold text-gray-900 mb-1">{issueLabels[complaint.issueType] || complaint.issueType}</h4>
                     <p className="text-sm text-gray-500 mb-3">{complaint.description}</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-xs text-gray-400">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs text-gray-400">
                       <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {complaint.location}</span>
                       <span className="flex items-center gap-1"><User className="w-3 h-3" /> {complaint.userName}</span>
                       <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {complaint.userPhone}</span>
                       <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(complaint.submittedAt).toLocaleDateString()}</span>
                       <span className="flex items-center gap-1"><Building className="w-3 h-3" /> {complaint.assignedDepartment}</span>
+                      <span className={`flex items-center gap-1 ${complaint.assignedOfficer ? "text-indigo-500 font-medium" : ""}`}>
+                        <User className="w-3 h-3" />
+                        {complaint.assignedOfficer ? `Officer: ${complaint.assignedOfficer}` : "Unassigned"}
+                      </span>
                     </div>
                     {/* Photo display */}
                     {complaint.photo && (

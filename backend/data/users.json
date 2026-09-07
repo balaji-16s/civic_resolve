@@ -1,65 +1,24 @@
 [
   {
+    "_id": "123f1c4707f7415f8b3c1a377e94be62",
+    "name": "Alice",
+    "email": "alice@example.com",
+    "phone": "9876543001",
+    "passwordHash": "7f70a259b9696a60b19216af69adba39$20aa6780e0c3dc0b44d7dabbb692a0fcda3533bb48eecb7d737b35bafc09820c",
+    "createdAt": "2026-09-07T15:18:29.682109+00:00"
+  },
+  {
     "_id": "gov-admin-user",
     "name": "Government Admin",
     "email": "admin@civicresolve.gov",
     "phone": "",
-    "createdAt": "2026-06-23T07:15:43.927206+00:00"
-  },
-  {
-    "_id": "57998c74-0dcf-4687-ad6e-395be40913f0",
-    "name": "rajesh",
-    "email": "rajeshmarrapu838@gmail.com",
-    "phone": "7794847729",
-    "passwordHash": "44c41cc0cc25b2409bdb34fcca496110$ff7d3ca9ecd8be1d6d41df7025f46e1f4b945306192aba8d0b05c7a7997d6f00",
-    "createdAt": "2026-06-25T07:28:45.814230+00:00"
-  },
-  {
-    "_id": "86779535-c47d-4817-a36f-85b13efa9566",
-    "name": "rajesh",
-    "email": "medurisaibalaji16@gmail.com",
-    "phone": "7794847729",
-    "passwordHash": "e7f42a3705243f26ea28da938618928a$23460b73901a6195cac27d73bced5d71ba2795f3ff4ad6209e270c2fe3b68591",
-    "createdAt": "2026-06-25T07:30:12.577345+00:00"
-  },
-  {
-    "_id": "b5ff3bb4-86ed-4b48-a6e7-a0a02304eecf",
-    "name": "siddu",
-    "email": "sidduofficial143@gmail.com",
-    "phone": "7794847729",
-    "passwordHash": "17acd56569893d2e7e73c0e2121acace$5cf95d6d073a5779f69d0e34daf02556443421c06aaf9e9a61b0cbe0b689469c",
-    "createdAt": "2026-07-02T09:56:36.148426+00:00"
+    "createdAt": "2026-09-07T15:18:29.718963+00:00"
   },
   {
     "_id": "sample-demo-user",
     "name": "Demo Citizen",
     "email": "demo@civicresolve.gov",
     "phone": "9876543000",
-    "createdAt": "2026-07-23T02:26:33.532520+00:00"
-  },
-  {
-    "_id": "475886d0-a019-477e-848f-08b2eae556d7",
-    "name": "sai balaji",
-    "email": "saibalajimeduri@gmail.com",
-    "phone": "7794847729",
-    "passwordHash": "6cb741fd6f4ff9dcbd5fc715ac829d92$9a546e73a454191b54fb0822248d2c15dea16af0f69aa1e7a872b72ce56abc31",
-    "createdAt": "2026-07-23T02:47:37.400316+00:00",
-    "googleId": "116681564750382691818"
-  },
-  {
-    "_id": "d2a26cb4-1a9f-4604-8f7a-058ed9d4bc7a",
-    "name": "Kottakota Hemanth",
-    "email": "hemanthkottakota07@gmail.com",
-    "phone": "",
-    "googleId": "111080921277903375564",
-    "createdAt": "2026-09-06T09:52:19.412314+00:00"
-  },
-  {
-    "_id": "c61979be-8f94-4c89-94b5-4db082c0ca84",
-    "name": "MEDURI SAI BALAJI",
-    "email": "25335a4404@mvgrce.edu.in",
-    "phone": "",
-    "googleId": "115238170098511781623",
-    "createdAt": "2026-09-06T12:31:35.399827+00:00"
+    "createdAt": "2026-09-07T15:42:51.941469+00:00"
   }
 ]

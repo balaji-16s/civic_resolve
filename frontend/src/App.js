@@ -16,7 +16,10 @@ import MyComplaints from "@/components/MyComplaints";
 import Dashboard from "@/components/Dashboard";
 import DeptLogin from "@/components/DeptLogin";
 import DeptDashboard from "@/components/DeptDashboard";
-import { GovRoute, CitizenRoute, DeptRoute } from "@/components/ProtectedRoute";
+import OfficerDashboard from "@/components/OfficerDashboard";
+import DeptOfficerManagement from "@/components/DeptOfficerManagement";
+import GovDepartmentManagement from "@/components/GovDepartmentManagement";
+import { GovRoute, CitizenRoute, OfficerRoute, HeadRoute } from "@/components/ProtectedRoute";
 
 const BASENAME = process.env.REACT_APP_BASENAME || process.env.PUBLIC_URL || '';
 
@@ -53,6 +56,37 @@ function App() {
 
           {/* Government routes - no Layout wrapper (full-screen header) */}
           <Route path="/gov-login" element={<GovLogin />} />
+
+          {/* Department routes */}
+          <Route path="/dept-login" element={<DeptLogin />} />
+          {/* Head: full department complaints + assignment view */}
+          <Route
+            path="/dept-dashboard"
+            element={
+              <HeadRoute>
+                <DeptDashboard />
+              </HeadRoute>
+            }
+          />
+          {/* Head: officer records / performance + CRUD */}
+          <Route
+            path="/dept-officers"
+            element={
+              <HeadRoute>
+                <DeptOfficerManagement />
+              </HeadRoute>
+            }
+          />
+          {/* Officer: ONLY their own assigned complaints */}
+          <Route
+            path="/officer-dashboard"
+            element={
+              <OfficerRoute>
+                <OfficerDashboard />
+              </OfficerRoute>
+            }
+          />
+          {/* Government routes - no Layout wrapper (full-screen header) */}
           <Route
             path="/dashboard"
             element={
@@ -61,15 +95,13 @@ function App() {
               </GovRoute>
             }
           />
-
-          {/* Department routes */}
-          <Route path="/dept-login" element={<DeptLogin />} />
+          {/* Government: per-department head + officer records & CRUD */}
           <Route
-            path="/dept-dashboard"
+            path="/gov/departments"
             element={
-              <DeptRoute>
-                <DeptDashboard />
-              </DeptRoute>
+              <GovRoute>
+                <GovDepartmentManagement />
+              </GovRoute>
             }
           />
         </Routes>

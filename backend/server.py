@@ -1237,6 +1237,13 @@ async def create_complaint(body: ComplaintIn, user: dict = Depends(get_current_u
         "escalatedAt": None,
     }
 
+    # Auto-assign the best-ranked officer (fewest active complaints → most resolved → name)
+    ranked = await _rank_officers_by_workload(dept_slug)
+    if ranked:
+        best = ranked[0]
+        complaint["assignedOfficer"] = best["name"]
+        complaint["officerPhone"] = best["phone"]
+
     if db:
         await db.complaints.insert_one(complaint)
     else:
@@ -1376,15 +1383,20 @@ async def dept_login(body: DeptLoginRequest):
 async def get_dept_complaints(dept_user: tuple = Depends(get_current_dept_user)):
     dept_slug, role, user_info = dept_user
 
+    # Officers only ever see complaints assigned to them, never the whole department queue
+    query = {"assignedDeptSlug": dept_slug}
+    if role == "officer":
+        query["assignedOfficer"] = user_info["name"]
+
     if db:
-        docs = await db.complaints.find({"assignedDeptSlug": dept_slug}).sort("submittedAt", -1).to_list(5000)
+        docs = await db.complaints.find(query).sort("submittedAt", -1).to_list(5000)
         result = []
         for d in docs:
             d["id"] = str(d.pop("_id"))
             result.append(ComplaintOut(**d))
         return result
     else:
-        docs = sorted([c for c in complaints_collection if c.get("assignedDeptSlug") == dept_slug],
+        docs = sorted([c for c in complaints_collection if all(c.get(k) == v for k, v in query.items())],
                       key=lambda c: c.get("submittedAt", ""), reverse=True)
         result = []
         for d in docs:
@@ -1416,6 +1428,9 @@ async def update_dept_complaint_status(complaint_id: str, body: StatusUpdate,
             raise HTTPException(status_code=404, detail="Complaint not found")
         if doc.get("assignedDeptSlug") != dept_slug:
             raise HTTPException(status_code=403, detail="This complaint is not assigned to your department")
+        # Officers may only update complaints assigned to them
+        if role == "officer" and doc.get("assignedOfficer") != user_info["name"]:
+            raise HTTPException(status_code=403, detail="You can only update complaints assigned to you")
 
         # Only auto-assign officer if not already assigned by head
         if body.status == "in-progress" and not doc.get("assignedOfficer"):
@@ -1430,6 +1445,9 @@ async def update_dept_complaint_status(complaint_id: str, body: StatusUpdate,
             if c["_id"] == complaint_id:
                 if c.get("assignedDeptSlug") != dept_slug:
                     raise HTTPException(status_code=403, detail="This complaint is not assigned to your department")
+                # Officers may only update complaints assigned to them
+                if role == "officer" and c.get("assignedOfficer") != user_info["name"]:
+                    raise HTTPException(status_code=403, detail="You can only update complaints assigned to you")
                 # Only auto-assign officer if not already assigned by head
                 if body.status == "in-progress" and not c.get("assignedOfficer"):
                     c["assignedOfficer"] = user_info["name"]
@@ -1492,14 +1510,9 @@ async def assign_officer(complaint_id: str, body: OfficerAssign,
 
 @api_router.get("/dept/officers")
 async def get_dept_officers(dept_user: tuple = Depends(get_current_dept_user)):
+    """Return the department head and officers, each officer with live workload counts."""
     dept_slug, role, user_info = dept_user
-    dept_data = DEPARTMENT_USERS.get(dept_slug, {})
-    head = dept_data.get("head", {})
-    officers = dept_data.get("officers", [])
-    return {
-        "head": {"name": head.get("name"), "phone": head.get("phone"), "username": head.get("username")},
-        "officers": [{"name": o["name"], "phone": o["phone"], "username": o["username"]} for o in officers],
-    }
+    return await _get_officers_with_counts(dept_slug)
 
 
 @api_router.get("/dept/my-complaints")
@@ -1597,16 +1610,67 @@ async def remove_officer(username: str, dept_user: tuple = Depends(get_current_d
     dept_data = DEPARTMENT_USERS.get(dept_slug, {})
     officers = dept_data.get("officers", [])
 
+    removed_officer = None
     for i, off in enumerate(officers):
         if off["username"] == username:
-            removed = officers.pop(i)
-            return {
-                "success": True,
-                "message": f"Officer '{removed['name']}' removed from {DEPT_DISPLAY[dept_slug]}",
-                "officer": removed,
-            }
+            removed_officer = officers.pop(i)
+            break
 
-    raise HTTPException(status_code=404, detail="Officer not found")
+    if not removed_officer:
+        raise HTTPException(status_code=404, detail="Officer not found")
+
+    removed_name = removed_officer["name"]
+    reassigned_ids: list[str] = []
+
+    if db:
+        cursor = db.complaints.find(
+            {
+                "assignedDeptSlug": dept_slug,
+                "assignedOfficer": removed_name,
+                "status": {"$in": ["pending", "in-progress"]},
+            }
+        )
+        active_docs = await cursor.to_list(5000)
+        for doc in active_docs:
+            ranked = await _rank_officers_by_workload(
+                dept_slug, exclude_officer_username=username
+            )
+            if ranked:
+                new_officer = ranked[0]
+                await db.complaints.update_one(
+                    {"_id": doc["_id"]},
+                    {
+                        "$set": {
+                            "assignedOfficer": new_officer["name"],
+                            "officerPhone": new_officer["phone"],
+                        }
+                    },
+                )
+                reassigned_ids.append(doc["_id"])
+    else:
+        for c in complaints_collection:
+            if (
+                c.get("assignedDeptSlug") == dept_slug
+                and c.get("assignedOfficer") == removed_name
+                and c.get("status") in ("pending", "in-progress")
+            ):
+                ranked = await _rank_officers_by_workload(
+                    dept_slug, exclude_officer_username=username
+                )
+                if ranked:
+                    new_officer = ranked[0]
+                    c["assignedOfficer"] = new_officer["name"]
+                    c["officerPhone"] = new_officer["phone"]
+                    reassigned_ids.append(c["_id"])
+        if reassigned_ids:
+            _save_json(COMPLAINTS_FILE, complaints_collection)
+
+    return {
+        "success": True,
+        "message": f"Officer '{removed_officer['name']}' removed from {DEPT_DISPLAY[dept_slug]}",
+        "officer": removed_officer,
+        "reassignedComplaintIds": reassigned_ids,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2108,8 +2172,6 @@ async def health():
     return {"status": "healthy", "database": "connected" if db else "in-memory"}
 
 
-app.include_router(api_router)
-
 
 # ── Seed sample complaints for showcase ────────────────────────────────
 SAMPLE_USER_ID = "sample-demo-user"
@@ -2497,6 +2559,360 @@ def _seed_sample_complaints():
 
     _save_json(COMPLAINTS_FILE, complaints_collection)
     logger.info(f"Seeded {len(sample_complaints)} sample complaints for demo showcase")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  GOV-SCOPED DEPARTMENT ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════════
+# These require a gov-role JWT (issued by /api/auth/gov-login) and can manage
+# any department, not just the caller's own.
+
+
+async def get_current_gov_user(authorization: Optional[str] = Header(None)) -> dict:
+    """Require a gov-role JWT whose subject is the gov admin user."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid token")
+    token = authorization.split(" ", 1)[1]
+    payload = _decode_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    if payload.get("sub") != "gov-admin-user":
+        raise HTTPException(status_code=401, detail="Not a government user")
+    return {"id": "gov-admin-user", "name": "Government Admin", "role": "gov"}
+
+
+async def _get_officers_with_counts(dept_slug: str) -> dict:
+    """Return a department's head and officers with active/resolved complaint counts."""
+    dept_data = DEPARTMENT_USERS.get(dept_slug, {})
+    head = dept_data.get("head", {})
+    officers = dept_data.get("officers", [])
+
+    if db:
+        dept_complaints = await db.complaints.find({"assignedDeptSlug": dept_slug}).to_list(5000)
+    else:
+        dept_complaints = [c for c in complaints_collection if c.get("assignedDeptSlug") == dept_slug]
+
+    officer_workload = {}
+    for off in officers:
+        officer_workload[off["username"]] = {
+            "name": off["name"],
+            "phone": off["phone"],
+            "username": off["username"],
+            "activeComplaints": 0,
+            "resolvedCount": 0,
+        }
+    for c in dept_complaints:
+        assigned_username = None
+        for off in officers:
+            if off["name"] == c.get("assignedOfficer"):
+                assigned_username = off["username"]
+                break
+        if assigned_username and assigned_username in officer_workload:
+            if c.get("status") == "resolved":
+                officer_workload[assigned_username]["resolvedCount"] += 1
+            else:
+                officer_workload[assigned_username]["activeComplaints"] += 1
+
+    return {
+        "head": {"name": head.get("name"), "phone": head.get("phone"), "username": head.get("username")},
+        "officers": list(officer_workload.values()),
+    }
+
+
+async def _rank_officers_by_workload(dept_slug: str, exclude_officer_username: Optional[str] = None) -> list:
+    """Rank a department's officers by workload (fewest active complaints → most resolved → name).
+
+    Used to rebalance complaints when an officer is removed; the excluded officer is skipped.
+    """
+    dept_data = DEPARTMENT_USERS.get(dept_slug, {})
+    officers = [o for o in dept_data.get("officers", []) if o["username"] != exclude_officer_username]
+
+    if db:
+        dept_complaints = await db.complaints.find({"assignedDeptSlug": dept_slug}).to_list(5000)
+    else:
+        dept_complaints = [c for c in complaints_collection if c.get("assignedDeptSlug") == dept_slug]
+
+    officer_workload = {}
+    for off in officers:
+        officer_workload[off["username"]] = {
+            "name": off["name"],
+            "phone": off["phone"],
+            "username": off["username"],
+            "password": off["password"],
+            "activeComplaints": 0,
+            "resolvedCount": 0,
+        }
+    for c in dept_complaints:
+        assigned_username = None
+        for off in officers:
+            if off["name"] == c.get("assignedOfficer"):
+                assigned_username = off["username"]
+                break
+        if assigned_username and assigned_username in officer_workload:
+            if c.get("status") == "resolved":
+                officer_workload[assigned_username]["resolvedCount"] += 1
+            else:
+                officer_workload[assigned_username]["activeComplaints"] += 1
+
+    return sorted(
+        officer_workload.values(),
+        key=lambda o: (o["activeComplaints"], -o["resolvedCount"], o["name"]),
+    )
+
+
+async def _get_dept_complaint_stats(dept_slug: str) -> dict:
+    """Return {total, pending, inProgress, resolved} complaint counts for a department."""
+    if db:
+        docs = await db.complaints.find({"assignedDeptSlug": dept_slug}).to_list(5000)
+    else:
+        docs = [c for c in complaints_collection if c.get("assignedDeptSlug") == dept_slug]
+    stats = {"total": len(docs), "pending": 0, "inProgress": 0, "resolved": 0}
+    for c in docs:
+        status = c.get("status")
+        if status == "pending":
+            stats["pending"] += 1
+        elif status == "in-progress":
+            stats["inProgress"] += 1
+        elif status == "resolved":
+            stats["resolved"] += 1
+    return stats
+
+
+@api_router.get("/gov/departments")
+async def gov_list_departments(gov_user: dict = Depends(get_current_gov_user)):
+    """Gov admin overview: head + officer records with workload stats for every department."""
+    records = []
+    for dept_slug in DEPARTMENT_USERS:
+        data = await _get_officers_with_counts(dept_slug)
+        complaints = await _get_dept_complaint_stats(dept_slug)
+        records.append({
+            "deptSlug": dept_slug,
+            "deptName": DEPT_DISPLAY.get(dept_slug, dept_slug),
+            "head": data.get("head", {}),
+            "officerCount": len(data.get("officers", [])),
+            "officers": data.get("officers", []),
+            "complaints": complaints,
+        })
+    return {"departments": records}
+
+
+@api_router.put("/gov/departments/{dept_slug}/head")
+async def gov_update_head(
+    dept_slug: str,
+    body: AddOfficerRequest,
+    gov_user: dict = Depends(get_current_gov_user),
+):
+    """Gov user can update a department head's name/phone."""
+    if dept_slug not in DEPARTMENT_USERS:
+        raise HTTPException(status_code=404, detail="Department not found")
+
+    dept_data = DEPARTMENT_USERS[dept_slug]
+    head = dept_data.get("head", {})
+    head["name"] = body.name.strip()
+    head["phone"] = body.phone.strip()
+    return {
+        "success": True,
+        "message": f"Head updated for {DEPT_DISPLAY[dept_slug]}",
+        "head": dict(head),
+    }
+
+
+@api_router.get("/gov/departments/{dept_slug}/officers")
+async def gov_get_officers(
+    dept_slug: str,
+    gov_user: dict = Depends(get_current_gov_user),
+):
+    """Gov user can view any department's officers (with stats)."""
+    if dept_slug not in DEPARTMENT_USERS:
+        raise HTTPException(status_code=404, detail="Department not found")
+    return await _get_officers_with_counts(dept_slug)
+
+
+@api_router.post("/gov/departments/{dept_slug}/officers")
+async def gov_add_officer(
+    dept_slug: str,
+    body: AddOfficerRequest,
+    gov_user: dict = Depends(get_current_gov_user),
+):
+    """Gov user can add an officer to any department."""
+    if dept_slug not in DEPARTMENT_USERS:
+        raise HTTPException(status_code=404, detail="Department not found")
+
+    dept_data = DEPARTMENT_USERS[dept_slug]
+    # Reuse the same duplicate-username checks as the dept-scoped add_officer
+    for d_slug, d_data in DEPARTMENT_USERS.items():
+        if d_data["head"]["username"] == body.username:
+            raise HTTPException(status_code=400, detail="Username already exists")
+        for off in d_data["officers"]:
+            if off["username"] == body.username:
+                raise HTTPException(status_code=400, detail="Username already exists")
+
+    phone = body.phone.strip()
+    if len(phone) != 10 or not phone.isdigit():
+        raise HTTPException(status_code=400, detail="Phone must be 10 digits")
+
+    new_officer = {
+        "name": body.name.strip(),
+        "username": body.username.strip(),
+        "password": "officer@123",  # default password, should be changed on first login
+        "phone": phone,
+    }
+    dept_data["officers"].append(new_officer)
+
+    return {
+        "success": True,
+        "message": f"Officer '{body.name}' added to {DEPT_DISPLAY[dept_slug]}",
+        "officer": new_officer,
+    }
+
+
+@api_router.put("/gov/departments/{dept_slug}/officers/{username}")
+async def gov_update_officer(
+    dept_slug: str,
+    username: str,
+    body: AddOfficerRequest,
+    gov_user: dict = Depends(get_current_gov_user),
+):
+    """Gov user can update any officer in any department."""
+    if dept_slug not in DEPARTMENT_USERS:
+        raise HTTPException(status_code=404, detail="Department not found")
+
+    dept_data = DEPARTMENT_USERS[dept_slug]
+    officers = dept_data.get("officers", [])
+
+    phone = body.phone.strip()
+    if len(phone) != 10 or not phone.isdigit():
+        raise HTTPException(status_code=400, detail="Phone must be 10 digits")
+
+    for off in officers:
+        if off["username"] == username:
+            off["name"] = body.name.strip()
+            off["phone"] = phone
+            return {
+                "success": True,
+                "message": f"Officer '{body.name}' updated in {DEPT_DISPLAY[dept_slug]}",
+                "officer": dict(off),
+            }
+
+    raise HTTPException(status_code=404, detail="Officer not found")
+
+
+@api_router.delete("/gov/departments/{dept_slug}/officers/{username}")
+async def gov_remove_officer(
+    dept_slug: str,
+    username: str,
+    gov_user: dict = Depends(get_current_gov_user),
+):
+    """Gov user can remove an officer from any department.
+
+    Active (non-resolved) complaints previously assigned to this officer are
+    rebalanced across the remaining officers using the same workload-ranking
+    logic so that no complaint gets orphaned.
+    """
+    if dept_slug not in DEPARTMENT_USERS:
+        raise HTTPException(status_code=404, detail="Department not found")
+
+    dept_data = DEPARTMENT_USERS[dept_slug]
+    officers = dept_data.get("officers", [])
+
+    removed_officer = None
+    for i, off in enumerate(officers):
+        if off["username"] == username:
+            removed_officer = officers.pop(i)
+            break
+
+    if not removed_officer:
+        raise HTTPException(status_code=404, detail="Officer not found")
+
+    removed_name = removed_officer["name"]
+    reassigned_ids: list[str] = []
+
+    if db:
+        cursor = db.complaints.find(
+            {
+                "assignedDeptSlug": dept_slug,
+                "assignedOfficer": removed_name,
+                "status": {"$in": ["pending", "in-progress"]},
+            }
+        )
+        active_docs = await cursor.to_list(5000)
+        for doc in active_docs:
+            ranked = await _rank_officers_by_workload(
+                dept_slug, exclude_officer_username=username
+            )
+            if ranked:
+                new_officer = ranked[0]
+                await db.complaints.update_one(
+                    {"_id": doc["_id"]},
+                    {
+                        "$set": {
+                            "assignedOfficer": new_officer["name"],
+                            "officerPhone": new_officer["phone"],
+                        }
+                    },
+                )
+                reassigned_ids.append(doc["_id"])
+    else:
+        for c in complaints_collection:
+            if (
+                c.get("assignedDeptSlug") == dept_slug
+                and c.get("assignedOfficer") == removed_name
+                and c.get("status") in ("pending", "in-progress")
+            ):
+                ranked = await _rank_officers_by_workload(
+                    dept_slug, exclude_officer_username=username
+                )
+                if ranked:
+                    new_officer = ranked[0]
+                    c["assignedOfficer"] = new_officer["name"]
+                    c["officerPhone"] = new_officer["phone"]
+                    reassigned_ids.append(c["_id"])
+        if reassigned_ids:
+            _save_json(COMPLAINTS_FILE, complaints_collection)
+
+    return {
+        "success": True,
+        "message": f"Officer '{removed_officer['name']}' removed from {DEPT_DISPLAY[dept_slug]}",
+        "officer": removed_officer,
+        "reassignedComplaintIds": reassigned_ids,
+    }
+
+
+@api_router.put("/dept/officers/{username}")
+async def update_officer(
+    username: str,
+    body: AddOfficerRequest,
+    dept_user: tuple = Depends(get_current_dept_user),
+):
+    """HOD can update an officer's name/phone in their department."""
+    dept_slug, role, user_info = dept_user
+
+    if role != "head":
+        raise HTTPException(status_code=403, detail="Only department head can update officers")
+
+    dept_data = DEPARTMENT_USERS.get(dept_slug, {})
+    officers = dept_data.get("officers", [])
+
+    phone = body.phone.strip()
+    if len(phone) != 10 or not phone.isdigit():
+        raise HTTPException(status_code=400, detail="Phone must be 10 digits")
+
+    for off in officers:
+        if off["username"] == username:
+            off["name"] = body.name.strip()
+            off["phone"] = phone
+            return {
+                "success": True,
+                "message": f"Officer '{body.name}' updated in {DEPT_DISPLAY[dept_slug]}",
+                "officer": dict(off),
+            }
+
+    raise HTTPException(status_code=404, detail="Officer not found")
+
+
+# All routes must be registered on api_router before this runs: FastAPI copies the
+# routes into the app at include time, so this stays at the very end of the module.
+app.include_router(api_router)
 
 
 if __name__ == "__main__":

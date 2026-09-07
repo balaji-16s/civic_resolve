@@ -5,7 +5,7 @@ import { Doughnut, Bar } from "react-chartjs-2";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import {
-  BarChart3, ArrowLeft, MapPin, User, Phone, Calendar, Building, Play, Check, Eye,
+  BarChart3, ArrowLeft, MapPin, User, Users, Phone, Calendar, Building, Play, Check, Eye,
   RefreshCw, Search, X, LogOut, Loader2, ShieldCheck, Clock, AlertTriangle, CheckCircle2,
   Lightbulb, Star
 } from "lucide-react";
@@ -190,6 +190,12 @@ export default function DeptDashboard() {
               </p>
             </div>
             <div className="flex gap-2">
+              {role === "head" && (
+                <button onClick={() => navigate("/dept-officers")} className="inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 rounded-xl px-4 py-2 text-sm font-medium transition-all">
+                  <Users className="w-4 h-4" />
+                  Manage Officers
+                </button>
+              )}
               <button onClick={loadData} disabled={loading} className="inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 rounded-xl px-4 py-2 text-sm font-medium transition-all">
                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
                 Refresh
